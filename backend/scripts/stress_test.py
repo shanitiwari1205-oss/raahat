@@ -15,9 +15,8 @@ import statistics
 import time
 
 from app.decision.baselines import greedy_nearest, hungarian, min_cost_flow
-from app.decision.gnn_policy import GNNEncoder, allocate_with_policy
+from app.decision.np_policy import allocate_with_policy, load_models
 from app.decision.scenario import generate_scenario
-from app.decision.triage import train_triage_scorer
 from app.ledger.store import Ledger
 from app.sim.graph import build_stress_graph
 from app.sim.world import World
@@ -26,7 +25,7 @@ from app.supervisor import Supervisor
 
 def _time_decision_layer(n_zones: int, n_trials: int = 15) -> dict:
     graph = build_stress_graph(n_zones)
-    encoder = GNNEncoder()
+    encoder, _ = load_models()  # the shipped NumPy runtime, not the training wrapper
     results: dict[str, list[float]] = {"greedy": [], "hungarian": [], "min_cost_flow": [], "gnn_trained": []}
 
     for trial in range(n_trials):
@@ -45,7 +44,7 @@ def _time_decision_layer(n_zones: int, n_trials: int = 15) -> dict:
         results["min_cost_flow"].append((time.perf_counter() - t0) * 1000)
 
         t0 = time.perf_counter()
-        allocate_with_policy(encoder, scenario, sample=False)
+        allocate_with_policy(encoder, scenario)
         results["gnn_trained"].append((time.perf_counter() - t0) * 1000)
 
     return {k: {"mean_ms": round(statistics.mean(v), 3), "max_ms": round(max(v), 3)} for k, v in results.items()}
@@ -64,8 +63,7 @@ def _time_tick_loop(n_ticks: int = 300) -> dict:
 async def _time_supervisor_throughput(n_spikes: int = 20) -> dict:
     world = World()
     ledger = Ledger(db_path=":memory:")
-    encoder = GNNEncoder()
-    triage_model, _ = train_triage_scorer(epochs=50)
+    encoder, triage_model = load_models()
     supervisor = Supervisor(world, ledger, encoder, triage_model)
 
     zone_ids = list(world.zones)

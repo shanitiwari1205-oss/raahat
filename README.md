@@ -23,9 +23,9 @@
 |---|---|
 | **Problem Statement** | **EL-02 — Intelligent & Transparent Disaster Relief Resource Allocation** |
 | **Hackathon** | ELEVATE 1.0, DJ Sanghvi College of Engineering (with NSDC) |
-| **Live demo** | *add after `vercel --prod` — see §8* |
+| **Live demo** | **[raahat.vercel.app](https://elevate-disaster-relief.vercel.app)** — full app, deployed (Vercel) |
 | **Source** | this repository |
-| **Status** | Full backend (simulation, trained allocation policy vs. 3 classical baselines, hash-chained ledger, supervisor loop) + full interactive frontend (live map, 3 scripted demo scenarios, scenario injector, ledger explorer with independent client-side verification). 19/19 backend tests passing. |
+| **Status** | Full backend (simulation, trained allocation policy vs. 3 classical baselines, hash-chained ledger, supervisor loop) + full interactive frontend (live map, 3 scripted demo scenarios, scenario injector, ledger explorer with independent client-side verification). 22/22 backend tests passing. |
 
 ---
 
@@ -135,21 +135,20 @@ Backend (Python 3.12 + FastAPI, single process)
 
 Full architecture rationale and PRD-to-module traceability: [`SYSTEM-ARCHITECTURE.md`](SYSTEM-ARCHITECTURE.md). Phase-by-phase build plan: [`BUILD-PLAN.md`](BUILD-PLAN.md). Pitch deck content plan: [`PPT-CONTENT-PLAN.md`](PPT-CONTENT-PLAN.md).
 
-**Nothing here is a mock or a stub:** the GNN is a real PyTorch message-passing policy trained via REINFORCE on this exact simulation (hand-rolled, not `torch_geometric`, specifically so a judge can `pip install -r requirements.txt` and rerun it without fragile wheel-matching); the baselines are genuine `scipy`/`networkx` implementations, not fakes to lose to on purpose; the ledger is a real SHA-256 chain with real tamper-detection, not a decorative table.
+**Nothing here is a mock or a stub:** the GNN is a real message-passing policy trained via REINFORCE (actor-critic) on this exact simulation in PyTorch (hand-rolled, not `torch_geometric`, specifically so a judge can retrain it without fragile wheel-matching); the trained weights ship as a 20 KB `.npz` and the live server runs them through a numerically verified pure-NumPy twin of the torch forward pass (`np_policy.py` — parity-tested to ~1e-7, torch kept out of the deployed runtime to fit Vercel's 500 MB function limit); the baselines are genuine `scipy`/`networkx` implementations, not fakes to lose to on purpose; the ledger is a real SHA-256 chain with real tamper-detection, not a decorative table.
 
 ## 8. Run it — live or local
 
-**Live demo:** *[add the Vercel URL here once deployed — `vercel login && vercel --prod` from the repo root; `vercel.json` is already configured for the two-service (`web`/`api`) same-origin deployment, no further setup needed]*
+**Live demo:** **[https://elevate-disaster-relief.vercel.app](https://elevate-disaster-relief.vercel.app)** — deployed on Vercel as one project with two same-origin services (`web` frontend + `api` FastAPI behind `/server/*`), no setup needed. The three scripted demo scenarios, the Scenario Injector, the live benchmark, and the Ledger Explorer all work against the live deployment.
 
 **Run it yourself:**
 ```bash
 git clone <this-repo-url>
 cd raahat
 
-# backend
+# backend — runtime needs only requirements.txt (inference is pure NumPy)
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only build, see requirements.txt
 pip install -r requirements.txt
 uvicorn app.main:app --port 8842
 
@@ -158,13 +157,14 @@ cd frontend
 npm install
 npm run dev   # open the URL Vite prints
 ```
+Training or re-exporting the models additionally needs `pip install -r requirements-train.txt` (torch) and `python -m scripts.export_weights` from `backend/`.
 The frontend talks to the backend via `frontend/.env.local` (`VITE_WS_URL=ws://localhost:8842/ws`) in local dev; in production it defaults to the same-origin `/server/ws` path that `vercel.json`'s rewrite rules provide, so no env var is needed at deploy time.
 
 **Reproduce every number in this README:**
 ```bash
 cd backend && source .venv/bin/activate
-python -m pytest tests/ -v              # 19 automated tests
-curl http://localhost:8842/benchmark    # allocation strategy comparison, live
+python -m pytest tests/ -v              # 22 automated tests (3 verify torch↔NumPy parity when torch is installed)
+curl http://localhost:8842/server/benchmark    # allocation strategy comparison, live
 python -m scripts.stress_test           # latency/throughput numbers
 ```
 
@@ -190,7 +190,7 @@ PPT-CONTENT-PLAN.md         pitch deck content plan, filled with real numbers
 
 ## 10. Tech stack
 
-`Python 3.12` / `FastAPI` (simulation + orchestration, single process) · `PyTorch` (hand-rolled GNN message-passing encoder) · `scipy` / `networkx` (Hungarian, min-cost-flow baselines) · `SQLite` (hash-chain ledger) · `React` + `TypeScript` + `deck.gl` (live 3D-tilted map) · `MapLibre GL` (basemap, no API key required) · `Zustand` (frontend state) · `WebCrypto` (client-side ledger verification) · deployed on `Vercel` (one project, two same-origin services, native WebSocket on the Python runtime).
+`Python 3.12` / `FastAPI` (simulation + orchestration, single process) · `PyTorch` (hand-rolled GNN message-passing encoder, training only) + `NumPy` (numerically verified inference twin that actually serves traffic — keeps the deploy under Vercel's 500 MB cap) · `scipy` / `networkx` (Hungarian, min-cost-flow baselines) · `SQLite` (hash-chain ledger) · `React` + `TypeScript` + `deck.gl` (live 3D-tilted map) · `MapLibre GL` (basemap, no API key required) · `Zustand` (frontend state) · `WebCrypto` (client-side ledger verification) · deployed on `Vercel` (one project, two same-origin services, native WebSocket on the Python runtime).
 
 ## 11. References
 

@@ -279,3 +279,27 @@ async def run_demo_scenario(scenario_name: str):
 @app.get("/replay")
 async def get_replay():
     return {"window_s": app.state.replay.window_s, "items": app.state.replay.recent()}
+
+
+class _StripServerPrefix:
+    """Vercel services routing delivers the public path unmodified, so the
+    same-origin /server/* rewrite reaches FastAPI as /server/health etc.
+    Strips the /server prefix (http + websocket scopes) so the API keeps its
+    plain /health, /ws route paths while the browser calls /server/*."""
+
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    def __getattr__(self, name):
+        # delegate app.state etc. so the rest of the module is unchanged
+        return getattr(self.asgi_app, name)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket") and scope.get("path", "").startswith("/server/"):
+            scope = dict(scope)
+            scope["path"] = scope["path"][len("/server"):] or "/"
+            scope["raw_path"] = scope["path"].encode()
+        await self.asgi_app(scope, receive, send)
+
+
+app = _StripServerPrefix(app)

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from .decision.benchmark import run_benchmark
 from .decision.gnn_policy import GNNEncoder
 from .decision.triage import TriageScorer, train_triage_scorer
-from .ledger.store import Ledger
+from .ledger.store import Ledger, canonical_payload
 from .sim.world import World, run_tick_loop
 from .supervisor import Supervisor
 
@@ -212,7 +212,14 @@ async def set_strategy(req: StrategyRequest):
 async def get_ledger(limit: int = 50, offset: int = 0):
     records = app.state.ledger.list_records(limit=limit, offset=offset)
     return [
-        {"id": r.id, "timestamp": r.timestamp, "prev_hash": r.prev_hash, "hash": r.hash, **r.data}
+        {
+            "id": r.id,
+            "timestamp": r.timestamp,
+            "prev_hash": r.prev_hash,
+            "hash": r.hash,
+            "canonical_payload": canonical_payload(r.prev_hash, r.timestamp, r.data),
+            **r.data,
+        }
         for r in records
     ]
 

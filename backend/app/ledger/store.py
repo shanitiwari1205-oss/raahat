@@ -24,6 +24,17 @@ def compute_hash(prev_hash: str, data: dict) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def canonical_payload(prev_hash: str, timestamp: float, data: dict) -> str:
+    """The exact byte string compute_hash() hashes for one record. Exposed via
+    the API so a client (e.g. the browser, over WebCrypto) can independently
+    recompute SHA-256(payload) without having to guess at JSON number
+    formatting -- Python's json module distinguishes int vs float (e.g. a
+    donor's flat `150000` vs a computed `3750.0`) in ways a client-side
+    reimplementation of `_canonical_json` cannot reliably infer back from the
+    already-parsed JSON value alone."""
+    return prev_hash + _canonical_json({"timestamp": timestamp, **data})
+
+
 @dataclass
 class LedgerRecord:
     id: int

@@ -101,3 +101,180 @@ body {
 .status-connected { color: var(--relief); }
 .status-connecting { color: var(--caution); }
 .status-disconnected { color: var(--alert); }
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+
+.hard-select,
+.hard-input {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  padding: 7px 8px;
+  border-radius: var(--radius);
+}
+.hard-select:focus,
+.hard-input:focus {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
+
+.hard-button.sm {
+  padding: 6px 10px;
+  font-size: 11px;
+  box-shadow: 3px 3px 0 var(--line);
+}
+.hard-button.full { width: 100%; }
+.hard-button.tone-alert { background: var(--alert); color: var(--paper); }
+.hard-button.tone-info { background: var(--info); color: var(--paper); }
+.hard-button.tone-relief { background: var(--relief); color: var(--paper); }
+
+.hard-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  background: var(--paper);
+  border: 2px solid var(--line);
+  cursor: pointer;
+}
+.hard-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--info);
+  border: 2px solid var(--line);
+  cursor: pointer;
+}
+.hard-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--info);
+  border: 2px solid var(--line);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.action-result {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  border: 2px solid var(--line);
+  word-break: break-word;
+}
+.action-result.ok { background: color-mix(in srgb, var(--relief) 18%, var(--paper)); }
+.action-result.err { background: color-mix(in srgb, var(--alert) 18%, var(--paper)); }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border: 2px solid var(--line);
+  background: var(--paper);
+}
+.chip.valid { background: color-mix(in srgb, var(--relief) 22%, var(--paper)); }
+.chip.invalid { background: color-mix(in srgb, var(--alert) 22%, var(--paper)); }
+
+.ledger-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 35%, transparent);
+  padding: 8px 0;
+  font-size: 12px;
+}
+.ledger-row:last-child { border-bottom: none; }
+.ledger-row .desc { line-height: 1.35; margin-bottom: 3px; }
+.ledger-row .meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  opacity: 0.6;
+  font-family: var(--font-body);
+}
+
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+
+.help-fab {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  pointer-events: auto;
+}
+
+.tab-strip {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.tab-btn {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 7px 4px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  cursor: pointer;
+  opacity: 0.55;
+}
+.tab-btn.active {
+  opacity: 1;
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-cell {
+  border: 2px solid var(--line);
+  padding: 8px;
+}
+.stat-cell .num { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.stat-cell .lbl { font-size: 10px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.02em; }
+.stat-cell.best { background: color-mix(in srgb, var(--relief) 16%, var(--paper)); }

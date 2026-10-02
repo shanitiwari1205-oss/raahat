@@ -53,14 +53,27 @@ interface RaahatStore {
 
 const MAX_FEED_ITEMS = 40;
 
+// Module-level (not store-state) so StrictMode's intentional double-invoke of
+// mount effects in dev -- and any other accidental re-mount -- can never open
+// a second live socket for the same URL and double every broadcast feed item.
+let activeSocket: WebSocket | null = null;
+let activeUrl: string | null = null;
+
 export const useRaahatStore = create<RaahatStore>((set, get) => ({
   status: "connecting",
   world: null,
   feed: [],
   connect: (url: string) => {
+    if (activeUrl === url && activeSocket && activeSocket.readyState <= WebSocket.OPEN) {
+      return;
+    }
+    activeUrl = url;
+
     const open = () => {
+      if (activeUrl !== url) return; // a newer connect() superseded this one
       set({ status: "connecting" });
       const ws = new WebSocket(url);
+      activeSocket = ws;
 
       ws.onopen = () => set({ status: "connected" });
 
@@ -79,6 +92,7 @@ export const useRaahatStore = create<RaahatStore>((set, get) => ({
       };
 
       ws.onclose = () => {
+        if (activeUrl !== url) return; // superseded -- don't resurrect a stale connection
         set({ status: "disconnected" });
         setTimeout(open, 2000); // auto-reconnect, demo must survive a dropped connection
       };

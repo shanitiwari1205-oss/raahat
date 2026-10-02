@@ -1,16 +1,23 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-
 fastapi==0.142.2
 uvicorn[standard]==0.54.0
 pydantic==2.13.5
 networkx==3.7
 numpy==2.5.3
 scipy==1.18.1
-torch==2.14.1+cpu
+torch @ https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl
 websockets==17.1
 httpx==0.28.1
 pytest==9.1.1
 
-# torch is pinned to the explicit "+cpu" build so pip/uv can't silently
-# resolve the much larger default CUDA wheel from PyPI (that build is
-# 5+ GB and blew past Vercel's 500 MB function size limit on first deploy).
+# torch is fetched by direct wheel URL (the explicit "+cpu" build, cp312
+# linux x86_64) rather than via --extra-index-url. The default PyPI torch
+# wheel is CUDA-bundled and 5+ GB, which blew Vercel's 500 MB function size
+# limit on the first deploy attempt; registering the PyTorch CPU index as a
+# second global index to fix that then broke resolution of our own pinned
+# networkx==3.7 on the second attempt, because that index also mirrors an
+# older networkx and uv's default index-strategy trusts whichever index it
+# finds a package on first, even for an unrelated package. A direct wheel
+# URL for torch alone avoids registering a second index at all, so every
+# other package (including networkx) resolves from plain PyPI with no
+# ambiguity. If upgrading the torch version, update the exact wheel filename
+# by checking https://download.pytorch.org/whl/cpu/torch/ for cp312 x86_64.

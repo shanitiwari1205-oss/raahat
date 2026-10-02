@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-: "${GITHUB_TOKEN:?Set GITHUB_TOKEN in your shell first (export GITHUB_TOKEN=...), don't pass it as an argument}"
+: "${GITHUB_TOKEN:?Set GITHUB_TOKEN in your shell first with export, do not pass it as an argument}"
 : "${GITHUB_OWNER:?Set GITHUB_OWNER to the GitHub username/org to create the repo under}"
 REPO_NAME="${REPO_NAME:-raahat}"
 

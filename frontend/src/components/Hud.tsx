@@ -28,10 +28,14 @@ export function Hud({
   status,
   world,
   feed,
+  replayMode,
+  onExitReplay,
 }: {
   status: "connecting" | "connected" | "disconnected";
   world: WorldSnapshot | null;
   feed: FeedItem[];
+  replayMode: boolean;
+  onExitReplay: () => void;
 }) {
   return (
     <div
@@ -47,6 +51,23 @@ export function Hud({
         pointerEvents: "none",
       }}
     >
+      {replayMode && (
+        <div className="hard-panel tone-alert" style={{ padding: "10px 14px", pointerEvents: "auto" }}>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 12.5 }}>
+            ⚠ REPLAY MODE — live connection lost
+          </div>
+          <div style={{ fontSize: 11.5, opacity: 0.8, marginTop: 2 }}>
+            Showing the last ~60s of real activity while reconnecting automatically.{" "}
+            <button
+              onClick={onExitReplay}
+              style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", font: "inherit", padding: 0, color: "inherit" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="hard-panel" style={{ padding: 16, pointerEvents: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: 0, lineHeight: 1.1 }}>

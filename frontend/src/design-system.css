@@ -278,3 +278,37 @@ body {
 .stat-cell .num { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
 .stat-cell .lbl { font-size: 10px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.02em; }
 .stat-cell.best { background: color-mix(in srgb, var(--relief) 16%, var(--paper)); }
+.stat-cell.worst { background: color-mix(in srgb, var(--alert) 14%, var(--paper)); }
+
+.hard-panel.tone-alert {
+  background: color-mix(in srgb, var(--alert) 20%, var(--paper));
+  border-color: var(--alert);
+}
+
+.regime-label {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.7;
+  margin: 14px 0 6px;
+}
+
+.demo-scenario-card {
+  border: 2px solid var(--line);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.demo-scenario-card .title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-bottom: 3px;
+}
+.demo-scenario-card .blurb {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}

@@ -67,6 +67,41 @@ def build_road_graph() -> nx.DiGraph:
     return g
 
 
+def build_stress_graph(n_zones: int = 15) -> nx.DiGraph:
+    """A synthetic, larger road graph for Phase 6.4's stress test -- real
+    DEPOT_COORDS/HOSPITAL_COORDS reused, zones generated on a jittered ring
+    around Mumbai and chained to their neighbors plus the nearer depot, so
+    the graph stays fully connected (every zone reachable from both depots)
+    at any n_zones."""
+    import math
+
+    g = nx.DiGraph()
+    for node_id, (lat, lon) in {**DEPOT_COORDS, **HOSPITAL_COORDS}.items():
+        kind = "depot" if node_id in DEPOT_COORDS else "hospital"
+        g.add_node(node_id, kind=kind, lat=lat, lon=lon)
+
+    center_lat, center_lon = 19.12, 72.90
+    zone_ids = [f"zone-{i}" for i in range(1, n_zones + 1)]
+    for i, zid in enumerate(zone_ids):
+        angle = 2 * math.pi * i / n_zones
+        radius = 0.08 + 0.015 * (i % 3)
+        lat = center_lat + radius * math.sin(angle)
+        lon = center_lon + radius * math.cos(angle)
+        g.add_node(zid, kind="zone", lat=lat, lon=lon)
+
+    depot_ids = list(DEPOT_COORDS)
+    for i, zid in enumerate(zone_ids):
+        depot = depot_ids[i % len(depot_ids)]
+        g.add_edge(depot, zid, travel_time=8 + (i % 7), capacity=30, blocked=False)
+        g.add_edge(zid, depot, travel_time=8 + (i % 7), capacity=30, blocked=False)
+        nxt = zone_ids[(i + 1) % n_zones]
+        if nxt != zid:
+            g.add_edge(zid, nxt, travel_time=6 + (i % 5), capacity=25, blocked=False)
+            g.add_edge(nxt, zid, travel_time=6 + (i % 5), capacity=25, blocked=False)
+
+    return g
+
+
 def shortest_travel_time(g: nx.DiGraph, source: str, target: str) -> float | None:
     """Dijkstra over travel_time, skipping blocked edges. None if unreachable."""
     def weight(u, v, data):

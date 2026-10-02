@@ -55,11 +55,19 @@ def generate_scenario(
     depots: tuple[str, ...] = ("depot-1", "depot-2"),
     blocked_edges: list[tuple[str, str]] | None = None,
     resource: str | None = None,
+    stock_scale: float = 1.0,
+    demand_scale: float = 1.0,
+    graph: nx.DiGraph | None = None,
 ) -> Scenario:
     """Generates a reproducible synthetic scenario. Pass `seed` for
-    deterministic test/benchmark scenarios."""
+    deterministic test/benchmark scenarios. `stock_scale`/`demand_scale` let
+    the benchmark comparison (Phase 6.2) also run a genuinely scarcity-
+    constrained scenario -- the default (1.0/1.0) keeps supply generous
+    relative to demand, under which most strategies hit a 100% served-demand
+    ceiling and look identical; scarcity is where a trained policy's real
+    edge over Greedy should actually show up."""
     rng = random.Random(seed)
-    g = build_road_graph()
+    g = graph if graph is not None else build_road_graph()
     for u, v in blocked_edges or []:
         if g.has_edge(u, v):
             g[u][v]["blocked"] = True
@@ -75,7 +83,7 @@ def generate_scenario(
         demands.append(Demand(
             zone_id=z,
             resource=r,
-            amount=rng.uniform(10, 60),
+            amount=rng.uniform(10, 60) * demand_scale,
             urgency=rng.uniform(0.2, 1.0),
             vulnerability_index=rng.uniform(0.2, 0.9),
         ))
@@ -83,7 +91,7 @@ def generate_scenario(
     depot_stocks = []
     for d in depots:
         for r in resources:
-            depot_stocks.append(DepotStock(depot_id=d, resource=r, stock=rng.uniform(80, 250)))
+            depot_stocks.append(DepotStock(depot_id=d, resource=r, stock=rng.uniform(80, 250) * stock_scale))
 
     travel = _travel_time_matrix(g, list(depots), zone_ids)
 

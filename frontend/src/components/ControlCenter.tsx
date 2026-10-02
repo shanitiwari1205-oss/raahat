@@ -3,17 +3,19 @@ import type { WorldSnapshot } from "../store";
 import { ScenarioInjector } from "./ScenarioInjector";
 import { ControlsPanel } from "./ControlsPanel";
 import { LedgerExplorer } from "./LedgerExplorer";
+import { DemoPanel } from "./DemoPanel";
 
-type Tab = "scenario" | "controls" | "ledger";
+type Tab = "demo" | "scenario" | "controls" | "ledger";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "demo", label: "Demo" },
   { id: "scenario", label: "Scenario" },
   { id: "controls", label: "Controls" },
   { id: "ledger", label: "Ledger" },
 ];
 
 export function ControlCenter({ world }: { world: WorldSnapshot | null }) {
-  const [tab, setTab] = useState<Tab>("scenario");
+  const [tab, setTab] = useState<Tab>("demo");
 
   return (
     <div className="hard-panel" style={{ padding: 16, pointerEvents: "auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -26,6 +28,7 @@ export function ControlCenter({ world }: { world: WorldSnapshot | null }) {
         ))}
       </div>
       <div style={{ overflowY: "auto", minHeight: 0 }}>
+        {tab === "demo" && <DemoPanel />}
         {tab === "scenario" && <ScenarioInjector world={world} />}
         {tab === "controls" && <ControlsPanel />}
         {tab === "ledger" && <LedgerExplorer />}

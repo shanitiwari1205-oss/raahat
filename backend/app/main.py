@@ -6,12 +6,15 @@ from contextlib import asynccontextmanager
 
 import torch
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .decision.benchmark import run_benchmark
 from .decision.gnn_policy import GNNEncoder
 from .decision.triage import TriageScorer, train_triage_scorer
+from .demo import DEMO_SCENARIOS
 from .ledger.store import Ledger, canonical_payload
+from .replay import ReplayBuffer
 from .sim.world import World, run_tick_loop
 from .supervisor import Supervisor
 
@@ -47,28 +50,62 @@ async def lifespan(app: FastAPI):
     app.state.ledger = ledger
     app.state.supervisor = supervisor
     app.state.ws_clients = set()
+    app.state.replay = ReplayBuffer(window_s=60.0)
 
     async def on_tick(fund_transfers):
         await supervisor.record_fund_transfers(fund_transfers)
         await _broadcast_state(app)
 
+    async def _replay_recorder():
+        # Decoupled from any specific WS client -- a single durable
+        # subscription that records every feed item into the replay buffer
+        # for as long as the app runs, independent of who's connected.
+        q = app.state.supervisor.subscribe_feed()
+        try:
+            while True:
+                item = await q.get()
+                app.state.replay.append("feed", item)
+        finally:
+            app.state.supervisor.unsubscribe_feed(q)
+
     tick_task = asyncio.create_task(run_tick_loop(world, interval_s=1.0, on_tick=on_tick))
     supervisor_task = asyncio.create_task(supervisor.run())
+    replay_task = asyncio.create_task(_replay_recorder())
 
     yield
 
     tick_task.cancel()
     supervisor_task.cancel()
+    replay_task.cancel()
     ledger.close()
 
 
 app = FastAPI(title="RAAHAT Disaster Relief Allocation API", lifespan=lifespan)
 
+# Public, read/no-secret demo API -- no cookies/auth to protect, so an open
+# CORS policy is a legitimate choice here (not a vulnerability to lock down),
+# and it's what makes local dev (frontend :5173/5174/5175+ -> backend :8842)
+# and the deployed cross-origin case both work without per-environment config.
+# This was a REAL bug, not just styling: every POST/GET from the browser was
+# failing CORS preflight (OPTIONS -> 405) before this, which silently broke
+# every interactive control (Scenario Injector, Ledger verify, Equity floor,
+# Strategy switch) even though curl-based testing never caught it, since curl
+# doesn't perform CORS preflight.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 async def _broadcast_state(app: FastAPI) -> None:
+    snapshot = app.state.world.snapshot()
+    app.state.replay.append("state", snapshot)
     if not app.state.ws_clients:
         return
-    payload = {"type": "state", "data": app.state.world.snapshot()}
+    payload = {"type": "state", "data": snapshot}
     dead = []
     for ws in app.state.ws_clients:
         try:
@@ -106,6 +143,7 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         forwarder_task.cancel()
         app.state.ws_clients.discard(websocket)
+        app.state.supervisor.unsubscribe_feed(feed_queue)
 
 
 # ---------- Scenario Injector REST routes ----------
@@ -242,3 +280,20 @@ async def debug_corrupt(record_id: int):
 @app.get("/benchmark")
 async def benchmark():
     return run_benchmark(app.state.supervisor.gnn_encoder)
+
+
+# ---------- Scripted demo scenarios (Phase 6.1) ----------
+
+@app.post("/demo/{scenario_name}")
+async def run_demo_scenario(scenario_name: str):
+    fn = DEMO_SCENARIOS.get(scenario_name)
+    if fn is None:
+        raise HTTPException(status_code=404, detail=f"unknown scenario '{scenario_name}', expected one of {list(DEMO_SCENARIOS)}")
+    return await fn(app.state.world, app.state.supervisor)
+
+
+# ---------- Demo-safety replay buffer (Phase 6.3) ----------
+
+@app.get("/replay")
+async def get_replay():
+    return {"window_s": app.state.replay.window_s, "items": app.state.replay.recent()}

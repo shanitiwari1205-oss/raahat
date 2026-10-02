@@ -21,7 +21,7 @@ function resolveApiBase(): string {
   return `${window.location.origin}/server`;
 }
 
-const API_BASE = resolveApiBase();
+export const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {}
 
@@ -79,10 +79,21 @@ export interface StrategyStats {
   all_capacity_valid: boolean;
 }
 
-export interface BenchmarkResult {
+export interface BenchmarkRegime {
   per_scenario: Record<string, unknown[]>;
   summary: Record<string, StrategyStats>;
   n_scenarios: number;
+}
+
+export interface BenchmarkResult {
+  baseline: BenchmarkRegime;
+  scarcity: BenchmarkRegime;
+}
+
+export interface DemoScenarioResult {
+  scenario: string;
+  label: string;
+  [key: string]: unknown;
 }
 
 export const STRATEGIES = ["gnn_trained", "greedy", "hungarian", "min_cost_flow"] as const;
@@ -158,4 +169,12 @@ export const api = {
   verifyLedger: () => request<VerifyResult>("/ledger/verify"),
   corruptRecord: (id: number) => request<{ ok: true; corrupted_record_id: number }>(`/ledger/_debug_corrupt/${id}`, { method: "POST" }),
   benchmark: () => request<BenchmarkResult>("/benchmark"),
+  runDemoScenario: (name: DemoScenarioName) => request<DemoScenarioResult>(`/demo/${name}`, { method: "POST" }),
 };
+
+export const DEMO_SCENARIOS = [
+  { id: "demand_spike", label: "A — Demand Spike", blurb: "Spikes medicine demand in the most vulnerable zone and watches the allocator reroute supply live." },
+  { id: "road_block_reroute", label: "B — Road Block + Reroute", blurb: "Blocks depot-2's direct road to zone-4, then spikes zone-4's demand so the allocator must find a longer route." },
+  { id: "hospital_cascade", label: "C — Hospital Cascade + Equity Floor", blurb: "Pushes a hospital toward capacity, then forces real scarcity and compares the SAME spike served with the equity floor off vs on." },
+] as const;
+export type DemoScenarioName = (typeof DEMO_SCENARIOS)[number]["id"];

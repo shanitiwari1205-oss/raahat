@@ -40,9 +40,16 @@ class Supervisor:
         self.feed_subscribers.append(q)
         return q
 
-    async def _publish_feed(self, message: str) -> None:
+    def unsubscribe_feed(self, q: asyncio.Queue) -> None:
+        if q in self.feed_subscribers:
+            self.feed_subscribers.remove(q)
+
+    async def _publish_feed(self, message: str, flows: list[dict] | None = None) -> None:
+        item: dict = {"t": time.time(), "message": message}
+        if flows:
+            item["flows"] = flows
         for q in self.feed_subscribers:
-            await q.put({"t": time.time(), "message": message})
+            await q.put(item)
 
     def _scenario_from_world_state(self, zone_id: str, resource: str, amount: float) -> Scenario:
         """Builds a one-event allocation scenario from live world state --
@@ -88,6 +95,7 @@ class Supervisor:
         result = self._run_allocation(scenario)
 
         lines = []
+        flows = []
         for alloc in result.allocations:
             if alloc.amount <= 0:
                 continue
@@ -101,6 +109,12 @@ class Supervisor:
                 description=f"{alloc.depot_id} -> {zone_id}: {alloc.amount:.1f} units {resource}",
             )
             lines.append(f"{alloc.amount:.0f} units from {alloc.depot_id} (₹{fund_amount:,.0f})")
+            # structured, so the frontend's ArcLayer can draw a real depot->zone
+            # flow arc instead of inferring it from the human-readable feed line
+            flows.append({
+                "depot_id": alloc.depot_id, "zone_id": zone_id,
+                "resource": resource, "amount": alloc.amount, "fund_amount": fund_amount,
+            })
 
         zone.demand[resource] = max(0.0, zone.demand.get(resource, 0.0) - sum(a.amount for a in result.allocations))
 
@@ -110,12 +124,12 @@ class Supervisor:
             f"reallocated {', '.join(lines) if lines else 'nothing available'} -> "
             f"equity floor {self.equity_floor:.0%} maintained -> completed in {elapsed_ms:.0f}ms"
         )
-        await self._publish_feed(feed_line)
+        await self._publish_feed(feed_line, flows=flows)
 
         return {
             "zone_id": zone_id, "resource": resource, "amount": amount,
             "served_pct": result.served_demand_pct(), "strategy": result.strategy,
-            "elapsed_ms": round(elapsed_ms, 2), "feed_line": feed_line,
+            "elapsed_ms": round(elapsed_ms, 2), "feed_line": feed_line, "flows": flows,
         }
 
     async def record_fund_transfers(self, transfers: list[dict]) -> None:

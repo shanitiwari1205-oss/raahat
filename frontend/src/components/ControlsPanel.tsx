@@ -95,6 +95,30 @@ function StrategyControl() {
   );
 }
 
+function RegimeGrid({ label, regime }: { label: string; regime: BenchmarkResult["baseline"] }) {
+  const served = Object.values(regime.summary).map((s) => s.avg_served_demand_pct);
+  const best = Math.max(...served);
+  const worst = Math.min(...served);
+  return (
+    <div>
+      <div className="regime-label">{label} &middot; {regime.n_scenarios} scenarios</div>
+      <div className="stat-grid">
+        {STRATEGIES.map((s) => {
+          const stats = regime.summary[s];
+          if (!stats) return null;
+          const tone = stats.avg_served_demand_pct === best ? "best" : stats.avg_served_demand_pct === worst ? "worst" : "";
+          return (
+            <div key={s} className={`stat-cell ${tone}`}>
+              <div className="num">{stats.avg_served_demand_pct.toFixed(1)}%</div>
+              <div className="lbl">{STRATEGY_LABELS[s]}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BenchmarkControl() {
   const [data, setData] = useState<BenchmarkResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,8 +136,6 @@ function BenchmarkControl() {
     }
   };
 
-  const bestServed = data ? Math.max(...Object.values(data.summary).map((s) => s.avg_served_demand_pct)) : null;
-
   return (
     <div>
       <div className="field-label">Trained policy vs. classical baselines</div>
@@ -122,24 +144,13 @@ function BenchmarkControl() {
       </button>
       {error && <div className="action-result err">{error}</div>}
       {data && (
-        <div className="stat-grid" style={{ marginTop: 10 }}>
-          {STRATEGIES.map((s) => {
-            const stats = data.summary[s];
-            if (!stats) return null;
-            const isBest = stats.avg_served_demand_pct === bestServed;
-            return (
-              <div key={s} className={`stat-cell ${isBest ? "best" : ""}`}>
-                <div className="num">{stats.avg_served_demand_pct.toFixed(1)}%</div>
-                <div className="lbl">{STRATEGY_LABELS[s]}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {data && (
-        <p style={{ fontSize: 11, opacity: 0.6, margin: "8px 0 0" }}>
-          Served demand %, averaged over {data.n_scenarios} held-out scenarios.
-        </p>
+        <>
+          <RegimeGrid label="Baseline (generous supply)" regime={data.baseline} />
+          <RegimeGrid label="Scarcity (depleted stock + blocked roads)" regime={data.scarcity} />
+          <p style={{ fontSize: 11, opacity: 0.6, margin: "10px 0 0" }}>
+            Served demand %, averaged over held-out scenarios. Green = best strategy, red = weakest, for each regime.
+          </p>
+        </>
       )}
     </div>
   );

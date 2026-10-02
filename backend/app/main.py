@@ -16,7 +16,12 @@ from .replay import ReplayBuffer
 from .sim.world import World, run_tick_loop
 from .supervisor import Supervisor
 
-LEDGER_DB_PATH = os.environ.get("RAAHAT_LEDGER_DB", os.path.join(os.path.dirname(__file__), "..", "ledger.db"))
+# /tmp is the only reliably writable path on Vercel's serverless Python
+# runtime -- the app directory (/var/task) is read-only, and sqlite appends
+# there fail with "attempt to write a readonly database" mid-demo. The ledger
+# is per-warm-instance state: it rebuilds from live ticks within seconds of a
+# cold start, which is fine for a live simulation demo.
+LEDGER_DB_PATH = os.environ.get("RAAHAT_LEDGER_DB", "/tmp/raahat-ledger.db")
 
 
 @asynccontextmanager

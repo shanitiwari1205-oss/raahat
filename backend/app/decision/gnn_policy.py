@@ -130,35 +130,75 @@ def allocate_with_policy(
         if built is None:
             continue
         depots, demands, depot_feats, zone_feats, edge_index, edge_travel = built
-        edge_logits, value = encoder(depot_feats, zone_feats, edge_index, edge_travel)
+        # One forward pass up front purely to get the episode's value estimate
+        # (the critic baseline) -- this is intentionally based on the initial
+        # state, standard for a value function.
+        _, value = encoder(depot_feats, zone_feats, edge_index, edge_travel)
         values.append(value)
         if not edge_index:
             continue
 
+        max_stock = max(dep.stock for dep in depots) or 1.0
         remaining_stock = {dep.depot_id: dep.stock for dep in depots}
         demand_order = sorted(range(len(demands)), key=lambda j: -demands[j].urgency)
 
         for j in demand_order:
             dem = demands[j]
-            candidate_edges = [e for e, (i, jj) in enumerate(edge_index) if jj == j]
-            if not candidate_edges:
-                continue
-            logits = edge_logits[candidate_edges].squeeze(-1)
-            probs = F.softmax(logits, dim=0)
-            if sample:
-                dist = torch.distributions.Categorical(probs)
-                choice = dist.sample()
-                log_probs.append(dist.log_prob(choice))
-            else:
-                choice = torch.argmax(probs)
-                log_probs.append(torch.log(probs[choice] + 1e-9))
+            remaining_demand = dem.amount
 
-            depot_i = edge_index[candidate_edges[choice.item()]][0]
-            depot_id = depots[depot_i].depot_id
-            available = remaining_stock[depot_id]
-            send = min(available, dem.amount)
-            if send > 0:
+            # Split across multiple depots if one alone can't cover the
+            # demand -- matches greedy_nearest's structure (baselines.py), which
+            # keeps pulling from the next-nearest depot until the demand is met
+            # or stock runs out. The policy previously picked exactly one depot
+            # per demand and stopped there even if under-served, which is a
+            # structural (not just training) disadvantage under scarcity: the
+            # baselines can "top up" from a second depot, the policy couldn't.
+            while remaining_demand > 1e-9:
+                # Re-run the encoder with depot features reflecting *current*
+                # remaining stock, not the scenario's initial stock. The node
+                # embeddings from a single up-front forward pass are frozen at
+                # the start state, so even with a feasibility mask (below) the
+                # policy was reasoning about depots as if they still had their
+                # original stock -- e.g. still favoring a nearly-empty nearby
+                # depot over a farther one with plenty left, because its
+                # learned embedding never reflected the depletion.
+                live_depot_feats = torch.tensor(
+                    [[remaining_stock[dep.depot_id] / max_stock, 1.0] for dep in depots], dtype=torch.float32
+                )
+                live_edge_logits, _ = encoder(live_depot_feats, zone_feats, edge_index, edge_travel)
+
+                # Feasibility mask: only consider depots that still have stock
+                # at all right now -- avoids wasting a sampled action on a
+                # depot that's already fully depleted.
+                candidate_edges = [
+                    e for e, (i, jj) in enumerate(edge_index)
+                    if jj == j and remaining_stock[depots[i].depot_id] > 1e-9
+                ]
+                if not candidate_edges:
+                    break  # no reachable depot has any stock left -- demand stays partially unmet
+                # edge_logits is already 1-D (each entry is a scalar score);
+                # index directly -- squeezing here previously collapsed the
+                # common single-candidate case (frequent once stock is this
+                # depleted) from shape [1] to a 0-d scalar, which Categorical
+                # rejects.
+                logits = live_edge_logits[candidate_edges]
+                probs = F.softmax(logits, dim=0)
+                if sample:
+                    dist = torch.distributions.Categorical(probs)
+                    choice = dist.sample()
+                    log_probs.append(dist.log_prob(choice))
+                else:
+                    choice = torch.argmax(probs)
+                    log_probs.append(torch.log(probs[choice] + 1e-9))
+
+                depot_i = edge_index[candidate_edges[choice.item()]][0]
+                depot_id = depots[depot_i].depot_id
+                available = remaining_stock[depot_id]
+                send = min(available, remaining_demand)
+                if send <= 0:
+                    break
                 remaining_stock[depot_id] -= send
+                remaining_demand -= send
                 allocations.append(Allocation(depot_id, dem.zone_id, resource, send))
 
     result = AllocationResult(strategy="gnn_trained", allocations=allocations, scenario=scenario)
@@ -192,6 +232,29 @@ def compute_reward(result: AllocationResult) -> float:
     return served_pct - travel_penalty - equity_penalty
 
 
+_TRAINING_DEPOT_ZONE_PAIRS = [
+    ("depot-1", "zone-1"), ("depot-1", "zone-2"), ("depot-1", "zone-3"),
+    ("depot-2", "zone-3"), ("depot-2", "zone-4"), ("depot-2", "zone-5"),
+]
+
+
+def _sample_training_scenario(rng: "__import__('random').Random", seed: int) -> Scenario:
+    """Mixes generous and scarce regimes, the latter sometimes with a blocked
+    road too, so the policy actually learns to reach for a farther depot when
+    the near one runs dry or is unreachable -- not just scarce, but shaped
+    like the Phase 6.2 benchmark's own scarcity regime (stock_scale~0.3,
+    demand_scale~1.6, blocked edges), which earlier training never saw at
+    all (it only ever trained on the generous default)."""
+    if rng.random() < 0.4:
+        return generate_scenario(seed=seed)
+    stock_scale = rng.uniform(0.2, 0.55)
+    demand_scale = rng.uniform(1.1, 1.7)
+    blocked = rng.sample(_TRAINING_DEPOT_ZONE_PAIRS, k=rng.choice([0, 0, 1, 2]))
+    return generate_scenario(
+        seed=seed, stock_scale=stock_scale, demand_scale=demand_scale, blocked_edges=blocked
+    )
+
+
 def train_gnn_policy(
     iterations: int = 60, episodes_per_iter: int = 12, lr: float = 3e-3, seed: int = 11,
 ) -> tuple[GNNEncoder, list[float]]:
@@ -206,7 +269,10 @@ def train_gnn_policy(
     built on (advantage-weighted log-prob, learned value baseline) without a
     clipped-ratio loop that can't do anything useful on a single step.
     """
+    import random as _random
+
     torch.manual_seed(seed)
+    rng = _random.Random(seed)
     encoder = GNNEncoder()
     optimizer = torch.optim.Adam(encoder.parameters(), lr=lr)
 
@@ -218,7 +284,7 @@ def train_gnn_policy(
 
         for _ in range(episodes_per_iter):
             scenario_seed_counter += 1
-            scenario = generate_scenario(seed=scenario_seed_counter)
+            scenario = _sample_training_scenario(rng, seed=scenario_seed_counter)
             result, log_probs, value = allocate_with_policy(encoder, scenario, sample=True)
             if not log_probs:
                 continue

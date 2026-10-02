@@ -61,7 +61,7 @@ Sub-sections: *System Architecture and Overall Workflow / Technologies, Framewor
 
 **Implementation and System Components (3 lines, with real numbers once captured):**
 - Allocation is modeled as a graph problem — zones/hospitals/depots as nodes, roads as edges — so a GNN policy reasons about network structure, not just flat features
-- Trained policy benchmarked live against Greedy, Hungarian-optimal, and min-cost-flow baselines — [X]% improvement once you have Phase 6.2's number
+- Trained policy benchmarked live against Greedy, Hungarian-optimal, and min-cost-flow baselines — matches the strongest baseline (Greedy) exactly under real scarcity (82.4% served demand each) and beats Hungarian-optimal by +12.3 percentage points (82.4% vs 70.2%), using a general learned graph policy rather than hardcoded nearest-first logic
 - Every allocation writes a hash-chained ledger record; chain integrity is re-verifiable client-side in milliseconds
 
 **Callout box:** *"Why a GNN and not a generic model: the allocation problem is structurally a graph — which zones are reachable, which roads are congested — a plain model over flat features can't reason about that structure the way a graph neural network can."*
@@ -73,7 +73,7 @@ Sub-sections: *Innovative Approach and Core Differentiators / Unique Features an
 
 **Core Differentiators (3 bullets):**
 - GNN-based policy that reasons over the live road-network graph, not a flat-feature model pretending structure doesn't matter
-- An explicit, operator-adjustable **equity floor** — efficiency and fairness are both first-class, tunable, and demoable live (toggle it on/off on the same scenario and watch the distribution change)
+- An explicit, operator-adjustable **equity floor** — efficiency and fairness are both first-class, tunable, and demoable live (toggle it on/off on the same scenario and watch the distribution change: measured 20% served with the floor off vs. 30% on, under a real scarcity scenario where there genuinely isn't enough blood stock to go around — see `docs/benchmark-results.md`)
 - Transparency that's actually verifiable on stage — a "Verify Chain" button, and a deliberate tamper demo showing a corrupted record getting rejected — not a claim, a proof
 
 **Comparison table (pull from `SYSTEM-ARCHITECTURE.md` §7):**
@@ -86,11 +86,11 @@ Nearest-hospital/static dispatch | Pure OR-only tools | Blockchain-heavy relief-
 ## Slide 5 — Feasibility and Viability
 Sub-sections: *Technical and Operational Feasibility / Scalability, Deployment and Resource Requirements / Challenges, Risks and Sustainability*
 
-**Stat callouts (large numbers, fill once captured per `BUILD-PLAN.md` §4):**
-- `<Xms>` — Allocator inference latency
-- `<1s>` — event-to-reallocation visible latency on stage
-- `[X]%` — served-demand improvement, trained GNN policy vs. best classical baseline
-- `100%` — ledger tamper-detection rate (if you ran the Phase 6.5 corrupted-record demo)
+**Stat callouts (large numbers, real measured values — see `docs/benchmark-results.md`):**
+- `5.5ms` — Allocator inference latency (mean, 15-zone stress scale; 2.4ms at demo scale)
+- `1.5ms` — mean event-to-reallocation latency, full triage→allocation→equity→ledger→feed pipeline (677.8 events/sec sustained throughput — far under the "visible in under a second" bar)
+- `82.4%` — served demand under real scarcity, trained GNN policy, matching the strongest classical baseline exactly and beating Hungarian-optimal by +12.3pp
+- `100%` — ledger tamper-detection rate, demonstrated live (deliberately corrupted record caught by both server-side verify and an independent browser-side re-hash, same record ID both times)
 
 **Technical and Operational Feasibility:**
 > Every component is a proven pattern applied to this specific problem: GNN-based routing policies are directly precedented in humanitarian/logistics routing literature, classical OR baselines (Hungarian, min-cost-flow) are industry-standard dispatch tools, and hash-chained ledgers are the actual core of production disaster-relief transparency platforms — not a novel unproven combination.
@@ -132,7 +132,7 @@ Sub-sections: *Research Background and Supporting Evidence / Datasets, Papers, S
 **Research Background and Supporting Evidence:**
 - Precedent for GNN-based routing on road networks under risk/disruption: PPO-GNN approaches to humanitarian aid vehicle routing in conflict/disaster-affected road networks
 - Precedent for equity-aware allocation: lexicographic min-cost-flow approaches that guarantee a protected demand floor before optimizing throughput
-- Precedent for the ledger approach: production disaster-relief transparency platforms (AidLedger, CrisisChain) use hash-chained/Merkle-rooted records as their verifiable core, with full smart-contract systems reserved for real-money settlement — we follow the same layering
+- Precedent for the ledger approach: we considered heavier on-chain approaches like AidLedger (Solana-based) and CrisisChain (full smart-contract USDC pools, MIT Bitcoin Hackathon winner) and deliberately chose a lighter hash-chain core instead — fast, genuinely verifiable live on stage with zero wallet/gas friction, matching the tamper-evidence guarantee those systems provide without their build/audit overhead
 
 **Datasets / Papers / Sources:**
 - PPO-GNN humanitarian aid routing (conflict-zone road networks, risk-aware routing benchmarks)

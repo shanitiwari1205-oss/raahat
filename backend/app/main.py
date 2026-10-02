@@ -4,46 +4,28 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-import torch
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .decision.benchmark import run_benchmark
-from .decision.gnn_policy import GNNEncoder
-from .decision.triage import TriageScorer, train_triage_scorer
+from .decision.np_policy import load_models
 from .demo import DEMO_SCENARIOS
 from .ledger.store import Ledger, canonical_payload
 from .replay import ReplayBuffer
 from .sim.world import World, run_tick_loop
 from .supervisor import Supervisor
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "models_store")
-GNN_WEIGHTS_PATH = os.path.join(MODEL_DIR, "gnn_policy.pt")
 LEDGER_DB_PATH = os.environ.get("RAAHAT_LEDGER_DB", os.path.join(os.path.dirname(__file__), "..", "ledger.db"))
-
-
-def _load_or_init_gnn() -> GNNEncoder:
-    encoder = GNNEncoder()
-    if os.path.exists(GNN_WEIGHTS_PATH):
-        encoder.load_state_dict(torch.load(GNN_WEIGHTS_PATH, map_location="cpu"))
-    encoder.eval()
-    return encoder
-
-
-def _init_triage() -> TriageScorer:
-    # small/fast enough to train at startup rather than ship a checkpoint
-    model, _ = train_triage_scorer(epochs=150)
-    model.eval()
-    return model
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     world = World()
     ledger = Ledger(db_path=LEDGER_DB_PATH)
-    gnn_encoder = _load_or_init_gnn()
-    triage_model = _init_triage()
+    # Both trained models load from one exported .npz (scripts/export_weights.py
+    # -- torch trains, this runtime runs pure NumPy; see np_policy.py for why).
+    gnn_encoder, triage_model = load_models()
     supervisor = Supervisor(world, ledger, gnn_encoder, triage_model)
 
     app.state.world = world

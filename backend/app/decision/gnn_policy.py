@@ -22,12 +22,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .allocation_types import EQUITY_VIOLATION_PENALTY_WEIGHT, TRAVEL_TIME_PENALTY_WEIGHT, Allocation, AllocationResult
+from .allocation_types import Allocation, AllocationResult
+from .equity import compute_reward, equity_violation_penalty  # noqa: F401 (re-exported; scoring is torch-free)
 from .scenario import Scenario, generate_scenario
 
 EDGE_FEATURES = 5  # travel_time_norm, stock_norm, demand_norm, urgency, vulnerability
 NODE_EMBED_DIM = 16
-EQUITY_FLOOR = 0.3  # default protected-demand fraction for vulnerable zones
 
 
 class GNNEncoder(nn.Module):
@@ -204,32 +204,6 @@ def allocate_with_policy(
     result = AllocationResult(strategy="gnn_trained", allocations=allocations, scenario=scenario)
     pooled_value = torch.stack(values).mean() if values else torch.tensor(0.0)
     return result, log_probs, pooled_value
-
-
-def equity_violation_penalty(result: AllocationResult, floor: float = EQUITY_FLOOR) -> float:
-    """Penalizes shortfall against a protected-demand floor for vulnerable zones."""
-    served: dict[str, float] = {}
-    for a in result.allocations:
-        served[a.zone_id] = served.get(a.zone_id, 0.0) + a.amount
-    penalty = 0.0
-    seen_zone_demand: dict[str, tuple[float, float]] = {}
-    for d in result.scenario.demands:
-        total, vuln = seen_zone_demand.get(d.zone_id, (0.0, d.vulnerability_index))
-        seen_zone_demand[d.zone_id] = (total + d.amount, max(vuln, d.vulnerability_index))
-    for zone_id, (total_demand, vuln) in seen_zone_demand.items():
-        if vuln < 0.6 or total_demand == 0:
-            continue
-        served_frac = served.get(zone_id, 0.0) / total_demand
-        shortfall = max(0.0, floor - served_frac)
-        penalty += shortfall
-    return penalty
-
-
-def compute_reward(result: AllocationResult) -> float:
-    served_pct = result.served_demand_pct()
-    travel_penalty = TRAVEL_TIME_PENALTY_WEIGHT * result.total_travel_time() / max(1, len(result.allocations))
-    equity_penalty = EQUITY_VIOLATION_PENALTY_WEIGHT * equity_violation_penalty(result)
-    return served_pct - travel_penalty - equity_penalty
 
 
 _TRAINING_DEPOT_ZONE_PAIRS = [

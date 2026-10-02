@@ -10,7 +10,12 @@ from __future__ import annotations
 
 import copy
 
-from .allocation_types import Allocation, AllocationResult
+from .allocation_types import (
+    EQUITY_VIOLATION_PENALTY_WEIGHT,
+    TRAVEL_TIME_PENALTY_WEIGHT,
+    Allocation,
+    AllocationResult,
+)
 from .scenario import Scenario
 
 DEFAULT_EQUITY_FLOOR = 0.3
@@ -66,3 +71,29 @@ def apply_equity_floor(
         allocations=combined_allocations,
         scenario=scenario,  # original, for correct served_demand_pct denominator
     )
+
+
+def equity_violation_penalty(result: AllocationResult, floor: float = DEFAULT_EQUITY_FLOOR) -> float:
+    """Penalizes shortfall against a protected-demand floor for vulnerable zones."""
+    served: dict[str, float] = {}
+    for a in result.allocations:
+        served[a.zone_id] = served.get(a.zone_id, 0.0) + a.amount
+    penalty = 0.0
+    seen_zone_demand: dict[str, tuple[float, float]] = {}
+    for d in result.scenario.demands:
+        total, vuln = seen_zone_demand.get(d.zone_id, (0.0, d.vulnerability_index))
+        seen_zone_demand[d.zone_id] = (total + d.amount, max(vuln, d.vulnerability_index))
+    for zone_id, (total_demand, vuln) in seen_zone_demand.items():
+        if vuln < VULNERABILITY_THRESHOLD or total_demand == 0:
+            continue
+        served_frac = served.get(zone_id, 0.0) / total_demand
+        shortfall = max(0.0, floor - served_frac)
+        penalty += shortfall
+    return penalty
+
+
+def compute_reward(result: AllocationResult) -> float:
+    served_pct = result.served_demand_pct()
+    travel_penalty = TRAVEL_TIME_PENALTY_WEIGHT * result.total_travel_time() / max(1, len(result.allocations))
+    equity_penalty = EQUITY_VIOLATION_PENALTY_WEIGHT * equity_violation_penalty(result)
+    return served_pct - travel_penalty - equity_penalty

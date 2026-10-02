@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from .allocation_types import AllocationResult
 from .baselines import greedy_nearest, hungarian, min_cost_flow
-from .gnn_policy import GNNEncoder, allocate_with_policy, compute_reward, equity_violation_penalty
+from .equity import compute_reward, equity_violation_penalty
+from .np_policy import NumpyGNNEncoder, allocate_with_policy
 from .scenario import Scenario, generate_scenario
 
 FIXED_TEST_SEEDS = list(range(5000, 5020))  # 20 held-out scenarios, untouched during training
@@ -37,7 +38,7 @@ def _row(result: AllocationResult) -> dict:
     }
 
 
-def _run_regime(encoder: GNNEncoder, seeds: list[int], scenario_kwargs: dict) -> dict:
+def _run_regime(encoder: NumpyGNNEncoder, seeds: list[int], scenario_kwargs: dict) -> dict:
     rows_by_strategy: dict[str, list[dict]] = {"greedy": [], "hungarian": [], "min_cost_flow": [], "gnn_trained": []}
 
     for seed in seeds:
@@ -45,7 +46,7 @@ def _run_regime(encoder: GNNEncoder, seeds: list[int], scenario_kwargs: dict) ->
         rows_by_strategy["greedy"].append(_row(greedy_nearest(scenario)))
         rows_by_strategy["hungarian"].append(_row(hungarian(scenario)))
         rows_by_strategy["min_cost_flow"].append(_row(min_cost_flow(scenario)))
-        gnn_result, _, _ = allocate_with_policy(encoder, scenario, sample=False)
+        gnn_result, _ = allocate_with_policy(encoder, scenario)
         gnn_result.strategy = "gnn_trained"
         rows_by_strategy["gnn_trained"].append(_row(gnn_result))
 
@@ -62,7 +63,7 @@ def _run_regime(encoder: GNNEncoder, seeds: list[int], scenario_kwargs: dict) ->
     return {"per_scenario": rows_by_strategy, "summary": summary, "n_scenarios": len(seeds)}
 
 
-def run_benchmark(encoder: GNNEncoder, seeds: list[int] = FIXED_TEST_SEEDS) -> dict:
+def run_benchmark(encoder: NumpyGNNEncoder, seeds: list[int] = FIXED_TEST_SEEDS) -> dict:
     return {
         "baseline": _run_regime(encoder, seeds, {}),
         "scarcity": _run_regime(encoder, seeds, SCARCITY_KWARGS),

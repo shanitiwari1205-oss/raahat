@@ -10,9 +10,8 @@ import time
 
 from .decision.baselines import greedy_nearest, hungarian, min_cost_flow
 from .decision.equity import DEFAULT_EQUITY_FLOOR, apply_equity_floor
-from .decision.gnn_policy import GNNEncoder, allocate_with_policy
+from .decision.np_policy import NumpyGNNEncoder, NumpyTriage, allocate_with_policy
 from .decision.scenario import Demand, DepotStock, Scenario
-from .decision.triage import TriageScorer, score as triage_score
 from .ledger.store import Ledger
 from .sim.entities import UNIT_COST_INR
 from .sim.world import World
@@ -25,7 +24,7 @@ STRATEGIES = {
 
 
 class Supervisor:
-    def __init__(self, world: World, ledger: Ledger, gnn_encoder: GNNEncoder, triage_model: TriageScorer):
+    def __init__(self, world: World, ledger: Ledger, gnn_encoder: NumpyGNNEncoder, triage_model: NumpyTriage):
         self.world = world
         self.ledger = ledger
         self.gnn_encoder = gnn_encoder
@@ -73,7 +72,7 @@ class Supervisor:
 
     def _run_allocation(self, scenario: Scenario):
         if self.active_strategy == "gnn_trained":
-            strategy_fn = lambda s: allocate_with_policy(self.gnn_encoder, s, sample=False)[0]
+            strategy_fn = lambda s: allocate_with_policy(self.gnn_encoder, s)[0]
         else:
             strategy_fn = STRATEGIES[self.active_strategy]
         return apply_equity_floor(scenario, strategy_fn, floor=self.equity_floor)
@@ -82,8 +81,7 @@ class Supervisor:
         t0 = time.perf_counter()
         zone = self.world.zones[zone_id]
 
-        urgency = triage_score(
-            self.triage_model,
+        urgency = self.triage_model.score(
             pop=min(1.0, zone.population / 60000),
             unmet=min(1.0, zone.total_demand() / self._max_unmet_seen),
             injury=zone.urgency,  # proxy until a richer injury-mix signal exists

@@ -1,0 +1,6 @@
+# Training / dev extras on top of requirements.txt -- NOT installed in the
+# Vercel deploy (torch's CPU wheel alone is ~770 MB vs Vercel's 500 MB
+# function limit; see requirements.txt). Local dev:
+#   pip install -r requirements.txt -r requirements-train.txt
+-r requirements.txt
+torch @ https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl

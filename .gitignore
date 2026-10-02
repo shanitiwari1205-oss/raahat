@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+*.local
+
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+*.db
+*.db-journal
+ledger.db
+
+.DS_Store
+*.log

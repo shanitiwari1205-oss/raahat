@@ -1,0 +1,15 @@
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+networkx==3.7
+numpy==2.5.3
+scipy==1.18.1
+torch==2.14.1
+websockets==17.1
+httpx==0.28.1
+pytest==9.1.1
+
+# torch is CPU-only here; install with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# before `pip install -r requirements.txt` on a fresh machine, or Vercel's
+# Python build step may pull a much larger CUDA build by default.

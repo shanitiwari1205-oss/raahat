@@ -1,0 +1,103 @@
+/* RAAHAT design system -- neo-brutalist, built for clarity first.
+   Thick borders and flat hard shadows carry real meaning (status, hierarchy),
+   not decoration: a non-technical operator should be able to tell at a
+   glance what's urgent, what's broken, and what just happened. */
+
+:root {
+  --ink: #0b0d0a;
+  --paper: #f4f1e8;
+  --alert: #ff3b1f;
+  --caution: #ffb800;
+  --relief: #1f7a4d;
+  --info: #1d4ed8;
+  --line: var(--ink);
+
+  --border-w: 3px;
+  --shadow-off: 6px;
+  --radius: 0px;
+
+  --font-display: "Space Grotesk", "Arial Black", sans-serif;
+  --font-body: "IBM Plex Mono", "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #f4f1e8;
+    --paper: #15140f;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #f4f1e8;
+  --paper: #15140f;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.hard-panel {
+  background: var(--paper);
+  border: var(--border-w) solid var(--line);
+  box-shadow: var(--shadow-off) var(--shadow-off) 0 var(--line);
+  border-radius: var(--radius);
+}
+
+.hard-button {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--border-w) solid var(--line);
+  box-shadow: 4px 4px 0 var(--line);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.hard-button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--line);
+}
+.hard-button:active {
+  transform: translate(0, 0);
+  box-shadow: 1px 1px 0 var(--line);
+}
+.hard-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border: 2px solid var(--line);
+}
+
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-connected { color: var(--relief); }
+.status-connecting { color: var(--caution); }
+.status-disconnected { color: var(--alert); }
